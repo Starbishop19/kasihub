@@ -1,25 +1,28 @@
-// Kasihub frontend script
-// connects to app.py backend using session cookies
+// KasiHub Frontend Script (Glass UI Version)
+// Communicates with app.py backend
 
-let currentUser = null; // stores logged in user info
+let currentUser = null; // Stores current session user data
 let currentReportFilter = 'all';
 let currentOutageFilter = 'all';
 
-// helper function to make api calls easier
+// --- Helper Functions ---
+
+// Safe API wrapper that handles credentials and errors
 async function api(url, options = {}) {
     const res = await fetch(url, {
-        credentials: 'same-origin', // sends flask session cookie
+        credentials: 'same-origin', // Sends Flask session cookie
         headers: { 'Content-Type': 'application/json' },
         ...options
     });
     const data = await res.json().catch(() => ({}));
+    
     if (!res.ok) {
-        throw new Error(data.message || 'something went wrong');
+        throw new Error(data.message || 'Something went wrong');
     }
     return data;
 }
 
-// prevents xss attacks when injecting html
+// Prevents XSS attacks when injecting HTML
 function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str)
@@ -30,32 +33,35 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
+// Shortcut for getElementById
 function $(id) {
     return document.getElementById(id);
 }
 
-// ---------- login stuff ----------
+// --- Authentication ---
 
 async function doLogin() {
-    const btn = $('login-btn');
-    const errEl = $('login-error');
-    errEl.textContent = '';
+    const btn = $('login-form').querySelector('button');
+    const msg = $('login-msg');
+    msg.textContent = '';
+    msg.style.color = '';
 
     const username = $('login-username').value.trim();
-    const role = $('login-role').value;
+    const password = $('login-password').value;
 
-    if (!username) {
-        errEl.textContent = 'please enter a username';
+    if (!username || !password) {
+        msg.textContent = '❌ Please enter username and password';
+        msg.style.color = '#ff0055';
         return;
     }
 
     btn.disabled = true;
-    btn.textContent = 'logging in...';
+    btn.textContent = 'Logging in...';
 
     try {
         const data = await api('/api/login', {
             method: 'POST',
-            body: JSON.stringify({ username, role })
+            body: JSON.stringify({ username, password })
         });
 
         currentUser = {
@@ -65,181 +71,397 @@ async function doLogin() {
             location: data.location
         };
 
+        // Save to local storage for auto-login next time
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        
         enterApp();
     } catch (err) {
-        errEl.textContent = err.message;
+        msg.textContent = '❌ ' + err.message;
+        msg.style.color = '#ff0055';
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Log In';
+        btn.textContent = 'Log In 🚀';
     }
 }
 
-async function doLogout() {
+async function doRegister() {
+    const btn = $('register-form').querySelector('button');
+    const msg = $('reg-msg');
+    msg.textContent = '';
+    msg.style.color = '';
+
+    const username = $('reg-username').value.trim();
+    const password = $('reg-password').value;
+    const location = $('reg-location').value.trim();
+    const role = $('reg-role').value;
+
+    if (!username || !password || !location) {
+        msg.textContent = '❌ Please fill all fields';
+        msg.style.color = '#ff0055';
+        return;
+    }
+
+    if (password.length < 6) {
+        msg.textContent = '❌ Password must be at least 6 characters';
+        msg.style.color = '#ff0055';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
     try {
-        await api('/api/logout');
-    } catch (e) {
-        // ignore errors here, we just want to clear the frontend state
-    }
+        const data = await api('/api/register', {
+            method: 'POST',
+            body: JSON.stringify({ username, password, location, role })
+        });
 
-    currentUser = null;
-    $('user-info').innerHTML = '';
-    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
-    $('login-section').classList.remove('hidden');
-    $('login-username').value = '';
-    $('login-error').textContent = '';
+        currentUser = {
+            id: data.user_id,
+            username: data.username,
+            role: role,
+            location: location
+        };
+
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        enterApp();
+    } catch (err) {
+        msg.textContent = '❌ ' + err.message;
+        msg.style.color = '#ff0055';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Account ✨';
+    }
 }
+
+function doLogout() {
+    api('/api/logout').catch(() => {}); // Ignore errors on logout
+    currentUser = null;
+    localStorage.removeItem('user');
+    location.reload();
+}
+
+// --- App Navigation & State ---
 
 function enterApp() {
-    $('login-section').classList.add('hidden');
+    // Switch Views
+    $('auth-view').classList.remove('active');
+    $('dashboard-view').classList.add('active');
+    $('dashboard-view').style.display = 'flex';
 
-    $('user-info').innerHTML =
-        '<strong>' + escapeHtml(currentUser.username) + '</strong><br>' +
-        '<span style="opacity:0.7">' + escapeHtml(currentUser.role) + '</span><br>' +
-        '<span style="opacity:0.7">' + escapeHtml(currentUser.location) + '</span>';
+    // Update User Info in Sidebar
+    $('display-name').textContent = currentUser.username;
+    $('display-role').textContent = currentUser.role;
+    $('greeting-name').textContent = currentUser.username;
 
-    // only show "My Stores" if they are a business account
-    $('nav-stores').classList.toggle('hidden', currentUser.role !== 'business');
+    // Handle Role-Based Visibility
+    if (currentUser.role === 'business') {
+        document.querySelectorAll('.business-only').forEach(el => el.style.display = 'block');
+    } else {
+        document.querySelectorAll('.business-only').forEach(el => el.style.display = 'none');
+    }
 
-    showSection('dashboard');
+    if (currentUser.role === 'public_service') {
+        document.querySelectorAll('.saps-only').forEach(el => el.style.display = 'block');
+    } else {
+        document.querySelectorAll('.saps-only').forEach(el => el.style.display = 'none');
+    }
+
+    // Load Dashboard Data
     loadDashboard();
 }
 
-// ---------- navigation ----------
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    // Remove active class from all nav items
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-function showSection(name) {
-    document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+    // Show target tab
+    const target = $('tab-' + tabName);
+    if (target) target.classList.add('active');
 
-    const target = $(name + '-section');
-    if (target) target.classList.remove('hidden');
+    // Highlight target nav item
+    const navMap = {
+        'home': 0,
+        'reports': 1,
+        'resources': 2,
+        'outages': 3,
+        'business': 4,
+        'saps': 5
+    };
+    
+    const navItems = document.querySelectorAll('.nav-item');
+    if (navItems[navMap[tabName]]) {
+        navItems[navMap[tabName]].classList.add('active');
+    }
 
-    document.querySelectorAll('.nav-links li').forEach(li => li.classList.remove('active'));
-    const activeLink = Array.from(document.querySelectorAll('.nav-links li'))
-        .find(li => (li.getAttribute('onclick') || '').includes("'" + name + "'"));
-    if (activeLink) activeLink.classList.add('active');
-
-    // load data when section is opened instead of all at once
-    if (name === 'dashboard') loadDashboard();
-    if (name === 'reports') loadReports();
-    if (name === 'resources') loadResourcesTab('stores-tab');
-    if (name === 'outages') loadOutages();
-    if (name === 'profile') loadProfile();
-    if (name === 'stores') loadManageStores();
+    // Load data specific to the tab
+    if (tabName === 'reports') loadReports();
+    if (tabName === 'resources') loadHelpers();
+    if (tabName === 'outages') loadOutages();
+    if (tabName === 'business') loadBusinessProfile();
+    if (tabName === 'saps') loadSapsMap();
 }
 
-// ---------- dashboard ----------
+// --- Dashboard Logic ---
 
 async function loadDashboard() {
     try {
         const stats = await api('/api/stats');
-        $('dash-water-val').textContent = stats.water + '%';
-        $('dash-water-bar').innerHTML =
-            '<div class="progress-fill" style="width:' + stats.water + '%"></div>';
-        $('dash-power').textContent = stats.power.replace('_', ' ');
+        
+        // Update Water UI
+        $('water-level').textContent = stats.water + '%';
+        $('water-fill').style.width = stats.water + '%';
+        $('water-slider').value = stats.water;
+
+        // Update Power UI
+        $('power-status').textContent = stats.power;
+        const powerIcon = $('power-icon');
+        if (stats.power === 'online') {
+            powerIcon.className = 'fa-solid fa-plug status-icon online';
+            powerIcon.style.color = '#00ff88';
+        } else {
+            powerIcon.className = 'fa-solid fa-plug status-icon offline';
+            powerIcon.style.color = '#ff0055';
+        }
+
     } catch (e) {
-        $('dash-water-val').textContent = 'failed to load';
-        $('dash-power').textContent = 'failed to load';
+        console.error('Stats fetch error:', e);
     }
 
+    // Fetch Risk Prediction
     if (currentUser) {
         try {
             const risk = await api('/api/predict-risk/' + currentUser.id);
-            const el = $('dash-risk');
-            el.textContent = risk.risk_score + '/100 (' + risk.severity + ')';
-            el.className = 'risk-' + risk.severity;
+            $('risk-score').textContent = risk.risk_score;
+            
+            const badge = $('risk-severity');
+            badge.textContent = risk.severity.charAt(0).toUpperCase() + risk.severity.slice(1);
+            badge.className = 'severity-badge severity-' + risk.severity;
+            
+            $('risk-action').textContent = risk.next_action;
 
-            $('dash-tips').innerHTML = risk.predictions.length
-                ? risk.predictions.map(t => '<li>' + escapeHtml(t) + '</li>').join('')
-                : '<li>all good for now 👍</li>';
+            const list = $('prediction-list');
+            list.innerHTML = '';
+            if (risk.predictions.length) {
+                risk.predictions.forEach(t => {
+                    const li = document.createElement('li');
+                    li.textContent = t;
+                    list.appendChild(li);
+                });
+            } else {
+                list.innerHTML = '<li>Everything looks good! 🌟</li>';
+            }
         } catch (e) {
-            $('dash-risk').textContent = 'N/A';
-            $('dash-tips').innerHTML = '<li>could not calculate risk.</li>';
+            console.error('Risk fetch error:', e);
         }
     }
 
+    // Fetch Weather
     try {
         const w = await api('/api/weather');
-        $('dash-weather').textContent =
-            w.temp + '°C · ' + w.desc + (w.warning && w.warning !== 'None' ? ' · ⚠️ ' + w.warning : '');
+        $('weather-temp').textContent = w.temp + '°C';
+        $('weather-desc').textContent = w.desc;
     } catch (e) {
-        $('dash-weather').textContent = 'weather unavailable';
+        console.error('Weather fetch error:', e);
     }
 }
 
-// ---------- reports ----------
+// --- Reports Logic ---
 
 async function loadReports() {
     const list = $('reports-list');
-    list.innerHTML = '<p>loading reports...</p>';
+    list.innerHTML = '<p style="text-align:center; opacity:0.7;">Loading reports...</p>';
 
     try {
-        const url = currentReportFilter === 'all'
-            ? '/api/reports'
-            : '/api/reports?category=' + encodeURIComponent(currentReportFilter);
+        let url = '/api/reports';
+        if (currentReportFilter !== 'all') {
+            url += '?category=' + encodeURIComponent(currentReportFilter);
+        }
 
         const reports = await api(url);
 
         if (!reports.length) {
-            list.innerHTML = '<p>no reports found.</p>';
+            list.innerHTML = '<p style="text-align:center; opacity:0.7;">No reports found.</p>';
             return;
         }
 
         list.innerHTML = reports.map(r => {
             const canResolve = r.status === 'open' && currentUser && currentUser.role === 'public_service';
             return (
-                '<div class="list-item ' + (r.status === 'resolved' ? 'resolved' : '') + '">' +
-                    '<div class="item-content">' +
-                        '<div class="item-title">' + escapeHtml(r.issue) + '</div>' +
-                        '<div classitem-meta">' +
-                            escapeHtml(r.category) + ' · ' + escapeHtml(r.location) +
-                            ' · by ' + escapeHtml(r.user) +
-                            ' · <span class="badge badge-' + escapeHtml(r.status) + '">' +
-                                escapeHtml(r.status) + '</span>' +
-                        '</div>' +
+                '<div class="glass-card report-card">' +
+                    '<div>' +
+                        '<strong>' + escapeHtml(r.issue) + '</strong><br>' +
+                        '<small style="opacity:0.7;">' + escapeHtml(r.category) + ' · ' + escapeHtml(r.location) + ' · by ' + escapeHtml(r.user) + '</small>' +
                     '</div>' +
-                    (canResolve
-                        ? '<button class="success" data-resolve="' + r.id + '">Resolve</button>'
-                        : '') +
+                    (canResolve 
+                        ? '<button class="btn-glow" style="margin-top:10px; font-size:0.8rem;" onclick="resolveReport(' + r.id + ')">Resolve Issue</button>' 
+                        : '<span class="badge badge-' + escapeHtml(r.status) + '" style="display:inline-block; margin-top:5px;">' + escapeHtml(r.status) + '</span>') +
                 '</div>'
             );
         }).join('');
 
-        // using event delegation instead of inline onclick because its cleaner
-        list.querySelectorAll('[data-resolve]').forEach(btn => {
-            btn.addEventListener('click', () => resolveReport(btn.dataset.resolve));
+    } catch (e) {
+        list.innerHTML = '<p class="error-msg" style="color:#ff0055;">Error loading reports: ' + escapeHtml(e.message) + '</p>';
+    }
+}
+
+// Global function for the onclick attribute in HTML
+window.resolveReport = async function(id) {
+    try {
+        await api('/api/report/' + id + '/resolve', { method: 'POST' });
+        alert('Issue resolved successfully!');
+        loadReports();
+    } catch (e) {
+        alert('Could not resolve: ' + e.message);
+    }
+};
+
+// --- Resources Logic ---
+
+async function loadHelpers() {
+    const grid = $('resource-grid');
+    const loc = $('resource-location').value.trim();
+    
+    if (!loc) {
+        grid.innerHTML = '<p style="text-align:center; opacity:0.7;">Enter a location to find helpers nearby...</p>';
+        return;
+    }
+
+    grid.innerHTML = '<p style="text-align:center; opacity:0.7;">Searching your area...</p>';
+
+    try {
+        const helpers = await api('/api/find-resources/' + encodeURIComponent(loc));
+
+        if (!helpers.length) {
+            grid.innerHTML = '<p style="text-align:center; opacity:0.7;">No neighbors with surplus water right now.</p>';
+            return;
+        }
+
+        grid.innerHTML = helpers.map(h => `
+            <div class="glass-card resource-card">
+                <strong>${escapeHtml(h.name)}</strong><br>
+                <small>💧 ${h.water_level}% · ⚡ ${escapeHtml(h.power_status)}</small>
+            </div>
+        `).join('');
+    } catch (e) {
+        grid.innerHTML = '<p class="error-msg" style="color:#ff0055;">Error: ' + escapeHtml(e.message) + '</p>';
+    }
+}
+
+// --- Outages Logic ---
+
+async function loadOutages() {
+    const list = $('outages-list');
+    list.innerHTML = '<p style="text-align:center; opacity:0.7;">Loading schedule...</p>';
+
+    try {
+        let url = '/api/outages';
+        if (currentOutageFilter !== 'all') {
+            url += '?type=' + encodeURIComponent(currentOutageFilter);
+        }
+
+        const outages = await api(url);
+        
+        if (!outages.length) {
+            list.innerHTML = '<p style="text-align:center; opacity:0.7;">No outages scheduled.</p>';
+            return;
+        }
+
+        list.innerHTML = outages.map(o => `
+            <div class="glass-card outage-card">
+                <strong>${o.type === 'power' ? '⚡' : '💧'} ${escapeHtml(o.area)}</strong><br>
+                <small style="opacity:0.7;">${escapeHtml(o.start_time)} → ${escapeHtml(o.end_time)}<br>${escapeHtml(o.notes)}</small>
+            </div>
+        `).join('');
+
+    } catch (e) {
+        list.innerHTML = '<p class="error-msg" style="color:#ff0055;">Error: ' + escapeHtml(e.message) + '</p>';
+    }
+}
+
+// --- Business Profile Logic ---
+
+async function loadBusinessProfile() {
+    try {
+        const data = await api('/api/business-profile');
+        
+        $('biz-crime-total').textContent = data.crime_total;
+        $('biz-crime-resolved').textContent = data.crime_resolved;
+
+        const zoneTable = $('zone-stats');
+        zoneTable.innerHTML = '';
+        
+        if (!data.zones.length) {
+            zoneTable.innerHTML = '<p>No zone data available.</p>';
+            return;
+        }
+
+        data.zones.forEach(z => {
+            zoneTable.innerHTML += `
+                <div class="glass-card">
+                    <strong>${escapeHtml(z.zone)}</strong><br>
+                    <small>Rate: ${z.burglary_rate} · Trend: ${z.trend}</small>
+                </div>
+            `;
         });
 
     } catch (e) {
-        list.innerHTML = '<p class="error-msg">could not load reports: ' + escapeHtml(e.message) + '</p>';
+        console.error('Business profile error:', e);
     }
 }
 
-async function resolveReport(id) {
-    try {
-        await api('/api/report/' + id + '/resolve', { method: 'POST' });
-        loadReports();
-    } catch (e) {
-        alert('could not resolve: ' + e.message);
+// --- SAPS Map Logic ---
+async function loadSapsMap() {
+    // In a real app, this would initialize Leaflet/Google Maps
+    // For now, we just show a placeholder
+    const mapContainer = $('map-placeholder');
+    mapContainer.innerHTML = '<p><i class="fa-solid fa-map-location-dot"></i> Interactive Map Loaded</p><p class="small">Connected to live report dots.</p>';
+}
+
+// --- Interactive Elements ---
+
+function updateWater(val) {
+    $('water-level').textContent = val + '%';
+    $('water-fill').style.width = val + '%';
+    
+    // Debounce or direct save? Let's save directly for responsiveness
+    api('/api/water-level', {
+        method: 'POST',
+        body: JSON.stringify({ water_level: parseInt(val) })
+    }).catch(e => console.error('Water update error:', e));
+}
+
+function toggleTheme() {
+    document.body.classList.toggle('dark-mode');
+    const icon = $('theme-toggle').querySelector('i');
+    if (document.body.classList.contains('dark-mode')) {
+        icon.className = 'fa-solid fa-sun';
+    } else {
+        icon.className = 'fa-solid fa-moon';
     }
 }
+
+// --- Modal Logic ---
 
 function openReportModal() {
-    $('report-location').value = currentUser.location;
-    $('report-modal').classList.remove('hidden');
+    $('report-modal').style.display = 'flex';
 }
 
 function closeReportModal() {
-    $('report-modal').classList.add('hidden');
+    $('report-modal').style.display = 'none';
     $('report-issue').value = '';
 }
 
 async function submitReport() {
     const issue = $('report-issue').value.trim();
     if (!issue) {
-        alert('please describe the issue');
+        alert('Please describe the issue');
         return;
     }
 
-    const btn = $('submit-report-btn');
+    const btn = $('report-form').querySelector('button');
     btn.disabled = true;
 
     try {
@@ -248,231 +470,46 @@ async function submitReport() {
             body: JSON.stringify({
                 issue: issue,
                 category: $('report-category').value,
-                location: $('report-location').value.trim() || currentUser.location
+                location: currentUser.location
             })
         });
 
         closeReportModal();
-        loadReports();
+        loadReports(); // Refresh list
     } catch (e) {
-        alert('failed to submit: ' + e.message);
+        alert('Failed to submit: ' + e.message);
     } finally {
         btn.disabled = false;
     }
 }
 
-// ---------- resources tab stuff ----------
-
-async function loadResourcesTab(tabId) {
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-
-    $(tabId).classList.add('active');
-    const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.dataset.tab === tabId);
-    if (btn) btn.classList.add('active');
-
-    if (tabId === 'stores-tab') loadStoresList();
-    if (tabId === 'services-tab') loadServicesList();
-    if (tabId === 'helpers-tab') loadHelpers();
-}
-
-async function loadStoresList() {
-    const list = $('stores-list');
-    list.innerHTML = '<p>loading stores...</p>';
-
-    try {
-        const stores = await api('/api/stores');
-        list.innerHTML = stores.map(s => `
-            <div class="list-item">
-                <div class="item-content">
-                    <div class="item-title">${escapeHtml(s.name)}</div>
-                    <div class="item-meta">${escapeHtml(s.type)} · ${escapeHtml(s.location)}</div>
-                </div>
-                <div>⚡ ${s.has_power ? '✅' : '❌'} &nbsp; 💧 ${s.has_water ? '✅' : '❌'}</div>
-            </div>
-        `).join('');
-    } catch (e) {
-        list.innerHTML = '<p class="error-msg">' + escapeHtml(e.message) + '</p>';
-    }
-}
-
-async function loadServicesList() {
-    const list = $('services-list');
-    list.innerHTML = '<p>loading services...</p>';
-
-    try {
-        const services = await api('/api/services');
-        list.innerHTML = services.map(s => `
-            <div class="list-item">
-                <div class="item-content">
-                    <div class="item-title">${escapeHtml(s.name)}</div>
-                    <div class="item-meta">${escapeHtml(s.type)} · ${escapeHtml(s.address)}</div>
-                </div>
-                <a href="tel:${escapeHtml(s.phone)}" class="outline" style="text-decoration:none">${escapeHtml(s.phone)}</a>
-            </div>
-        `).join('');
-    } catch (e) {
-        list.innerHTML = '<p class="error-msg">' + escapeHtml(e.message) + '</p>';
-    }
-}
-
-async function loadHelpers() {
-    const list = $('helpers-list');
-    list.innerHTML = '<p>searching your area...</p>';
-
-    try {
-        // uses the logged in user's actual location instead of hardcoded "Diepsloot"
-        const area = currentUser.location.split(' ')[0];
-        const helpers = await api('/api/find-resources/' + encodeURIComponent(area));
-
-        if (!helpers.length) {
-            list.innerHTML = '<p>no neighbors with surplus water right now.</p>';
-            return;
-        }
-
-        list.innerHTML = helpers.map(h => `
-            <div class="list-item">
-                <div class="item-content">
-                    <div class="item-title">${escapeHtml(h.name)}</div>
-                    <div class="item-meta">💧 ${h.water_level}% · ⚡ ${escapeHtml(h.power_status)}</div>
-                </div>
-            </div>
-        `).join('');
-    } catch (e) {
-        list.innerHTML = '<p class="error-msg">' + escapeHtml(e.message) + '</p>';
-    }
-}
-
-// ---------- outages ----------
-
-async function loadOutages() {
-    const list = $('outages-list');
-    list.innerHTML = '<p>loading schedule...</p>';
-
-    try {
-        const url = currentOutageFilter === 'all'
-            ? '/api/outages'
-            : '/api/outages?type=' + encodeURIComponent(currentOutageFilter);
-
-        const outages = await api(url);
-        list.innerHTML = outages.map(o => `
-            <div class="list-item">
-                <div class="item-content">
-                    <div class="item-title">${o.type === 'power' ? '⚡' : '💧'} ${escapeHtml(o.area)}</div>
-                    <div class="item-meta">
-                        ${escapeHtml(o.start_time)} → ${escapeHtml(o.end_time)} ·
-                        ${escapeHtml(o.stage)} · ${escapeHtml(o.notes)}
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    } catch (e) {
-        list.innerHTML = '<p class="error-msg">' + escapeHtml(e.message) + '</p>';
-    }
-}
-
-// ---------- manage my stores (ownership check happens here too) ----------
-
-async function loadManageStores() {
-    const msg = $('store-manage-msg');
-    const list = $('manage-stores-list');
-    list.innerHTML = '';
-    msg.textContent = 'loading...';
-
-    try {
-        const stores = await api('/api/stores');
-
-        // filter to only the stores owned by this user
-        // backend also checks this so even if someone edits the js they still get a 403
-        const mine = stores.filter(s => s.owner_user_id === currentUser.id);
-
-        if (!mine.length) {
-            msg.textContent = "you don't own any registered stores yet. ask an admin to link one to your account.";
-            return;
-        }
-
-        msg.textContent = 'these stores are linked to your account. update their live status below.';
-
-        list.innerHTML = mine.map(s => `
-            <div class="list-item">
-                <div class="item-content">
-                    <div class="item-title">${escapeHtml(s.name)}</div>
-                    <div class="item-meta">${escapeHtml(s.type)} · ${escapeHtml(s.location)}</div>
-                </div>
-                <div style="display:flex; gap:0.5rem; align-items:center;">
-                    <label><input type="checkbox" id="pwr-${s.id}" ${s.has_power ? 'checked' : ''}> Power</label>
-                    <label><input type="checkbox" id="wat-${s.id}" ${s.has_water ? 'checked' : ''}> Water</label>
-                    <button class="primary" data-save-store="${s.id}">Save</button>
-                </div>
-            </div>
-        `).join('');
-
-        list.querySelectorAll('[data-save-store]').forEach(btn => {
-            btn.addEventListener('click', () => saveStoreStatus(btn.dataset.saveStore));
-        });
-
-    } catch (e) {
-        msg.textContent = 'error: ' + e.message;
-    }
-}
-
-async function saveStoreStatus(sid) {
-    try {
-        await api('/api/store/' + sid + '/status', {
-            method: 'POST',
-            body: JSON.stringify({
-                has_power: $('pwr-' + sid).checked,
-                has_water: $('wat-' + sid).checked
-            })
-        });
-        alert('saved!');
-    } catch (e) {
-        // this is where "Not your store" would come back from the server
-        alert('save failed: ' + e.message);
-    }
-}
-
-// ---------- profile ----------
-
-async function loadProfile() {
-    try {
-        const p = await api('/api/profile');
-        $('profile-name').textContent = p.name;
-        $('profile-role').textContent = p.role;
-        $('profile-loc').textContent = p.location;
-        $('profile-water').textContent = p.water_level;
-        $('water-slider').value = p.water_level;
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-async function saveWaterLevel() {
-    const level = parseInt($('water-slider').value, 10);
-    try {
-        const res = await api('/api/water-level', {
-            method: 'POST',
-            body: JSON.stringify({ water_level: level })
-        });
-        $('profile-water').textContent = res.water_level;
-        $('water-status').textContent = 'updated ✅';
-        setTimeout(() => $('water-status').textContent = '', 2000);
-    } catch (e) {
-        $('water-status').textContent = 'failed: ' + e.message;
-    }
-}
-
-// ---------- event wiring ----------
+// --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    $('login-btn').addEventListener('click', doLogin);
+    // Auth Event Listeners
+    $('login-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        doLogin();
+    });
+    
+    $('register-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        doRegister();
+    });
+
     $('logout-btn').addEventListener('click', doLogout);
+
+    // Report Modal Events
     $('new-report-btn').addEventListener('click', openReportModal);
     $('cancel-report-btn').addEventListener('click', closeReportModal);
     $('submit-report-btn').addEventListener('click', submitReport);
-    $('save-water-btn').addEventListener('click', saveWaterLevel);
 
-    // report category filters
+    // Close modal if clicking outside
+    $('report-modal').addEventListener('click', (e) => {
+        if (e.target === $('report-modal')) closeReportModal();
+    });
+
+    // Filter Event Listeners
     document.querySelectorAll('#reports-section .filter').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#reports-section .filter').forEach(b => b.classList.remove('active'));
@@ -482,7 +519,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // outage type filters
     document.querySelectorAll('#outages-section .filter').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#outages-section .filter').forEach(b => b.classList.remove('active'));
@@ -492,28 +528,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // resource tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => loadResourcesTab(btn.dataset.tab));
-    });
+    // Resource Search Input
+    $('resource-location').addEventListener('input', loadHelpers);
 
-    // pressing enter in the username field logs you in
-    $('login-username').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') doLogin();
-    });
-
-    // clicking outside the modal closes it
-    $('report-modal').addEventListener('click', (e) => {
-        if (e.target === $('report-modal')) closeReportModal();
-    });
-
-    // check if there is already a session when the page loads
-    api('/api/profile')
-        .then(user => {
-            currentUser = { id: user.id, username: user.name, role: user.role, location: user.location };
-            enterApp();
-        })
-        .catch(() => {
-            // not logged in, just leave the login screen showing
-        });
+    // Auto-login check on page load
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+        try {
+            const user = JSON.parse(savedUser);
+            // Verify session is still valid
+            api('/api/profile')
+                .then(data => {
+                    currentUser = {
+                        id: data.id,
+                        username: data.name,
+                        role: data.role,
+                        location: data.location
+                    };
+                    enterApp();
+                })
+                .catch(() => {
+                    // Session expired, clear local storage
+                    localStorage.removeItem('user');
+                });
+        } catch (e) {
+            localStorage.removeItem('user');
+        }
+    } else {
+        // Check for existing session cookie
+        api('/api/profile')
+            .then(data => {
+                currentUser = {
+                    id: data.id,
+                    username: data.name,
+                    role: data.role,
+                    location: data.location
+                };
+                localStorage.setItem('user', JSON.stringify(currentUser));
+                enterApp();
+            })
+            .catch(() => {
+                // Not logged in, show login screen (default)
+            });
+    }
 });
