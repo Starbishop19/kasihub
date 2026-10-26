@@ -3,183 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kasihub Community</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <title>KasiHub ✨</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <nav class="sidebar" id="sidebar">
-            <div class="logo">Kasihub</div>
-            <div class="user-info" id="user-info">
-                <!-- Populated by JS -->
-            </div>
-            <ul class="nav-links">
-                <li onclick="showSection('dashboard')" class="active">Dashboard</li>
-                <li onclick="showSection('reports')">Reports</li>
-                <li onclick="showSection('resources')">Resources</li>
-                <li onclick="showSection('outages')">Outages</li>
-                <li id="nav-stores" onclick="showSection('stores')" class="hidden">My Stores</li>
-                <li onclick="showSection('profile')">Profile</li>
-            </ul>
-            <button id="logout-btn">Log Out</button>
-        </nav>
+    <!-- Background Blobs for Aesthetic -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
 
-        <!-- Main Content -->
-        <main class="content">
-            <!-- Login Screen -->
-            <div id="login-section" class="section">
-                <div class="login-card">
-                    <h1>Welcome to Kasihub</h1>
-                    <p>Community resilience for Diepsloot.</p>
-                    <div class="form-group">
-                        <label>Username</label>
-                        <input type="text" id="login-username" placeholder="e.g. Sipho">
+    <div class="app-container">
+        <!-- AUTH VIEW -->
+        <div id="auth-view" class="view active">
+            <div class="glass-card auth-card">
+                <div class="logo-area">
+                    <h1>KasiHub ✨</h1>
+                    <p>Your community, connected.</p>
+                </div>
+                
+                <div class="auth-tabs">
+                    <button class="tab active" onclick="showAuth('login')">Login</button>
+                    <button class="tab" onclick="showAuth('register')">Join</button>
+                </div>
+
+                <form id="login-form" class="auth-form active">
+                    <div class="input-group">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="login-username" placeholder="Username" required>
                     </div>
-                    <div class="form-group">
-                        <label>Role</label>
-                        <select id="login-role">
-                            <option value="community">Community Member</option>
-                            <option value="business">Business Owner</option>
-                            <option value="public_service">Public Service</option>
+                    <div class="input-group">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="login-password" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="btn-glow">Log In 🚀</button>
+                    <p id="login-msg" class="msg"></p>
+                </form>
+
+                <form id="register-form" class="auth-form">
+                    <div class="input-group">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <input type="text" id="reg-username" placeholder="Username" required>
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-key"></i>
+                        <input type="password" id="reg-password" placeholder="Password" required>
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <input type="text" id="reg-location" placeholder="Location (e.g. Diepsloot)" required>
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-id-badge"></i>
+                        <select id="reg-role">
+                            <option value="community">👤 Community</option>
+                            <option value="business">🏪 Business</option>
+                            <option value="public_service">🚑 Public Service</option>
                         </select>
                     </div>
-                    <button id="login-btn">Log In</button>
-                    <p id="login-error" class="error-msg"></p>
-                </div>
+                    <button type="submit" class="btn-glow">Create Account ✨</button>
+                    <p id="reg-msg" class="msg"></p>
+                </form>
             </div>
+        </div>
 
-            <!-- Dashboard -->
-            <div id="dashboard-section" class="section hidden">
-                <h2>Dashboard</h2>
-                <div class="stats-grid">
-                    <div class="card">
-                        <h3>Water Level</h3>
-                        <div class="progress-bar" id="dash-water-bar"></div>
-                        <p id="dash-water-val">Loading...</p>
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboard-view" class="view">
+            <!-- Sidebar -->
+            <aside class="glass-sidebar">
+                <div class="logo">
+                    <i class="fa-solid fa-users-rays"></i> KasiHub
+                </div>
+                <nav>
+                    <a href="#" class="nav-item active" onclick="switchTab('home')"><i class="fa-solid fa-house"></i> Home</a>
+                    <a href="#" class="nav-item" onclick="switchTab('reports')"><i class="fa-solid fa-circle-exclamation"></i> Reports</a>
+                    <a href="#" class="nav-item" onclick="switchTab('resources')"><i class="fa-solid fa-hand-holding-heart"></i> Resources</a>
+                    <a href="#" class="nav-item" onclick="switchTab('outages')"><i class="fa-solid fa-bolt"></i> Outages</a>
+                    <a href="#" class="nav-item business-only" onclick="switchTab('business')"><i class="fa-solid fa-store"></i> Business</a>
+                    <a href="#" class="nav-item saps-only" onclick="switchTab('saps')"><i class="fa-solid fa-map"></i> Map</a>
+                </nav>
+                <div class="user-info">
+                    <div class="user-details">
+                        <span id="display-name">User</span>
+                        <small id="display-role">Role</small>
                     </div>
-                    <div class="card">
-                        <h3>Power Status</h3>
-                        <p id="dash-power">Loading...</p>
+                    <button class="btn-logout" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="content">
+                <!-- Theme Toggle -->
+                <button id="theme-toggle" class="glass-btn" onclick="toggleTheme()">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+
+                <!-- HOME TAB -->
+                <div id="tab-home" class="tab-content active">
+                    <header>
+                        <h2>Hi, <span id="greeting-name">User</span> 👋</h2>
+                        <div class="weather-widget glass-card">
+                            <span id="weather-temp">25°C</span>
+                            <span id="weather-desc">Clear Sky ☀️</span>
+                        </div>
+                    </header>
+                    
+                    <div class="stats-grid">
+                        <div class="glass-card risk-card">
+                            <h3><i class="fa-solid fa-shield-halved"></i> Risk Score</h3>
+                            <div class="score-circle">
+                                <span id="risk-score">0</span>
+                            </div>
+                            <p id="risk-severity" class="severity-badge">Low</p>
+                            <p id="risk-action" class="action-text">Monitor Status</p>
+                        </div>
+                        <div class="glass-card">
+                            <h3>💧 Water</h3>
+                            <div class="progress-bar">
+                                <div class="fill" id="water-fill" style="width: 85%"></div>
+                            </div>
+                            <p id="water-level">85%</p>
+                            <input type="range" min="0" max="100" value="85" id="water-slider" oninput="updateWater(this.value)">
+                        </div>
+                        <div class="glass-card">
+                            <h3>⚡ Power</h3>
+                            <p id="power-status" class="status-text">Online</p>
+                            <i class="fa-solid fa-plug status-icon" id="power-icon"></i>
+                        </div>
                     </div>
-                    <div class="card">
-                        <h3>Risk Score</h3>
-                        <p id="dash-risk" class="risk-low">Loading...</p>
+
+                    <div class="glass-card tips-card">
+                        <h3>🔮 Predictions</h3>
+                        <ul id="prediction-list">
+                            <li>Calculating...</li>
+                        </ul>
                     </div>
-                    <div class="card">
-                        <h3>Weather</h3>
-                        <p id="dash-weather">Loading...</p>
+                </div>
+
+                <!-- REPORTS TAB -->
+                <div id="tab-reports" class="tab-content">
+                    <header>
+                        <h2>Community Reports 📢</h2>
+                        <button class="btn-glow" onclick="openReportModal()"><i class="fa-solid fa-plus"></i> New Report</button>
+                    </header>
+                    <div class="reports-list" id="reports-list"></div>
+                </div>
+
+                <!-- RESOURCES TAB -->
+                <div id="tab-resources" class="tab-content">
+                    <header>
+                        <h2>Find Helpers 🤝</h2>
+                        <input type="text" id="resource-location" placeholder="Where are you?" onkeyup="findResources()">
+                    </header>
+                    <div class="resource-grid" id="resource-grid"></div>
+                </div>
+
+                <!-- OUTAGES TAB -->
+                <div id="tab-outages" class="tab-content">
+                    <header>
+                        <h2>Service Outages ⚠️</h2>
+                    </header>
+                    <div class="outages-list" id="outages-list"></div>
+                </div>
+
+                <!-- BUSINESS TAB -->
+                <div id="tab-business" class="tab-content">
+                    <header>
+                        <h2>Business Dashboard 🏪</h2>
+                    </header>
+                    <div class="stats-grid">
+                        <div class="glass-card">
+                            <h3>Crime Reports</h3>
+                            <p id="biz-crime-total" class="big-num">0</p>
+                        </div>
+                        <div class="glass-card">
+                            <h3>Resolved</h3>
+                            <p id="biz-crime-resolved" class="big-num">0</p>
+                        </div>
+                    </div>
+                    <h3>Zone Trends</h3>
+                    <div class="zone-table" id="zone-stats"></div>
+                </div>
+
+                <!-- SAPS TAB -->
+                <div id="tab-saps" class="tab-content">
+                    <header>
+                        <h2>SAPS Ops 🚓</h2>
+                    </header>
+                    <div class="glass-card map-placeholder">
+                        <p><i class="fa-solid fa-map-location-dot"></i> Live Map Loading...</p>
+                        <p class="small">Connected to <code>/api/map-dots</code></p>
                     </div>
                 </div>
-                <div class="card tips-card">
-                    <h3>Recommendations</h3>
-                    <ul id="dash-tips"></ul>
-                </div>
-            </div>
-
-            <!-- Reports -->
-            <div id="reports-section" class="section hidden">
-                <div class="header-row">
-                    <h2>Reports</h2>
-                    <button id="new-report-btn">+ New Report</button>
-                </div>
-                <div class="filter-bar">
-                    <button class="filter active" data-cat="all">All</button>
-                    <button class="filter" data-cat="power">Power</button>
-                    <button class="filter" data-cat="water">Water</button>
-                    <button class="filter" data-cat="crime">Crime</button>
-                </div>
-                <div id="reports-list" class="list-container">
-                    <!-- Reports injected here -->
-                </div>
-            </div>
-
-            <!-- Resources -->
-            <div id="resources-section" class="section hidden">
-                <h2>Resources & Services</h2>
-                <div class="tabs">
-                    <button class="tab-btn active" data-tab="stores-tab">Stores</button>
-                    <button class="tab-btn" data-tab="services-tab">Services</button>
-                    <button class="tab-btn" data-tab="helpers-tab">Helpers</button>
-                </div>
-                
-                <div id="stores-tab" class="tab-content active">
-                    <div id="stores-list" class="list-container"></div>
-                </div>
-                
-                <div id="services-tab" class="tab-content hidden">
-                    <div id="services-list" class="list-container"></div>
-                </div>
-                
-                <div id="helpers-tab" class="tab-content hidden">
-                    <p>Find neighbors with surplus water in your area.</p>
-                    <div id="helpers-list" class="list-container"></div>
-                </div>
-            </div>
-
-            <!-- Outages -->
-            <div id="outages-section" class="section hidden">
-                <h2>Scheduled Outages</h2>
-                <div class="filter-bar">
-                    <button class="filter active" data-type="all">All</button>
-                    <button class="filter" data-type="power">Power</button>
-                    <button class="filter" data-type="water">Water</button>
-                </div>
-                <div id="outages-list" class="list-container"></div>
-            </div>
-
-            <!-- My Stores (Business Only) -->
-            <div id="stores-section" class="section hidden">
-                <h2>Manage My Stores</h2>
-                <p id="store-manage-msg">Loading your stores...</p>
-                <div id="manage-stores-list" class="list-container"></div>
-            </div>
-
-            <!-- Profile -->
-            <div id="profile-section" class="section hidden">
-                <h2>My Profile</h2>
-                <div class="card">
-                    <h3 id="profile-name"></h3>
-                    <p><strong>Role:</strong> <span id="profile-role"></span></p>
-                    <p><strong>Location:</strong> <span id="profile-loc"></span></p>
-                    <p><strong>Water Level:</strong> <span id="profile-water"></span>%</p>
-                    <input type="range" id="water-slider" min="0" max="100" value="50">
-                    <p>Update your water level:</p>
-                    <button id="save-water-btn">Update Level</button>
-                    <p id="water-status"></p>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <!-- Report Modal -->
-    <div id="report-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>New Report</h3>
-            <div class="form-group">
-                <label>Issue</label>
-                <textarea id="report-issue" rows="3" placeholder="Describe the issue..."></textarea>
-            </div>
-            <div class="form-group">
-                <label>Category</label>
-                <select id="report-category">
-                    <option value="power">Power</option>
-                    <option value="water">Water</option>
-                    <option value="crime">Crime</option>
-                    <option value="other">Other</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Location</label>
-                <input type="text" id="report-location" placeholder="Auto-filled">
-            </div>
-            <div class="modal-actions">
-                <button id="cancel-report-btn">Cancel</button>
-                <button id="submit-report-btn">Submit</button>
-            </div>
+            </main>
         </div>
     </div>
 
-    <script src="/static/script.js"></script>
+    <!-- Modal for New Report -->
+    <div id="report-modal" class="modal">
+        <div class="glass-card modal-content">
+            <span class="close" onclick="closeReportModal()">&times;</span>
+            <h3>File a Report 🚨</h3>
+            <form id="report-form">
+                <textarea id="report-issue" placeholder="Describe the issue..." required></textarea>
+                <select id="report-category">
+                    <option value="crime">Crime</option>
+                    <option value="power">Power/Electricity</option>
+                    <option value="water">Water</option>
+                    <option value="other">Other</option>
+                </select>
+                <button type="submit" class="btn-glow">Submit</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
